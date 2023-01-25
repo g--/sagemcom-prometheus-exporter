@@ -26,7 +26,7 @@ async def main() -> None:
 
         # Print device information of Sagemcom F@st router
         device_info = await client.get_device_info()
-        info = Info('sagencom_device_information', 'information about the sagencom device.')
+        info = Info('sagemcom_device_information', 'information about the sagencom device.')
         info.info({
             'mac_address': device_info.mac_address,
             'model_name': device_info.model_name,
@@ -39,10 +39,10 @@ async def main() -> None:
         })
 
 
-        sent_bytes = Counter('sagencom_interface_sent_bytes', '', ['interface'])
-        received_bytes = Counter('sagencom_interface_received_bytes', '', ['interface'])
-        sent_packets = Counter('sagencom_interface_sent_packets', '', ['interface'])
-        received_packets = Counter('sagencom_interface_received_packets', '', ['interface'])
+        sent_bytes = Counter('sagemcom_interface_sent_bytes', '', ['interface'])
+        received_bytes = Counter('sagemcom_interface_received_bytes', '', ['interface'])
+        sent_packets = Counter('sagemcom_interface_sent_packets', '', ['interface'])
+        received_packets = Counter('sagemcom_interface_received_packets', '', ['interface'])
         # Print connected devices
         devices = await client.get_hosts()
 
