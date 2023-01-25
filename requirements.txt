@@ -1,0 +1,3 @@
+sagemcom-api==1.0.8
+prometheus-client
+
