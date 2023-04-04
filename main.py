@@ -49,7 +49,7 @@ async def main() -> None:
 
         targets = [Interface(f"Device/Ethernet/Interfaces/Interface[@uid='{number}']") for number in range(1,7)]
         targets.append(Interface("Device/Optical/Interfaces/Interface[@uid='1']"))
-        targets.extend([WifiInterface(f"Device/WiFi/SSIDs/SSID[@uid='{number}']") for number in range(1,6)])
+        targets.extend([WifiInterface(f"Device/WiFi/SSIDs/SSID[@uid='{number}']") for number in range(1,8)])
         for t in targets:
             await t.init(client)
 
