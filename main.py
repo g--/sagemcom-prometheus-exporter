@@ -1,4 +1,4 @@
-from prometheus_client import start_http_server, Counter, Info, Enum
+from prometheus_client import start_http_server, Counter, Info, Enum, Gauge
 import time
 import asyncio
 from sagemcom_api.enums import EncryptionMethod
@@ -50,6 +50,7 @@ async def main() -> None:
 
         targets = [Interface(f"Device/Ethernet/Interfaces/Interface[@uid='{number}']") for number in range(1,7)]
         targets.append(OpticalInterface("Device/Optical/Interfaces/Interface[@uid='1']"))
+        targets.append(SystemMetrics())
         targets.extend([WifiInterface(f"Device/WiFi/SSIDs/SSID[@uid='{number}']") for number in range(1,8)])
         for t in targets:
             await t.init(client)
@@ -65,6 +66,20 @@ async def main() -> None:
                 await target.collect(client, interface_metrics)
 
 
+class SystemMetrics:
+    def __init__(self):
+        self._total_memory = Gauge('sagemcom_system_total_memory', '', [])
+        self._free_memory = Gauge('sagemcom_system_free_memory', '', [])
+
+    async def init(self, client):
+        pass
+
+    async def collect(self, client, interface_metrics):
+        results = await client.get_value_by_xpath("Device/DeviceInfo")
+        self._total_memory.set(results["device_info"]["memory_status"]["total"])
+        self._free_memory.set(results["device_info"]["memory_status"]["free"])
+
+
 @dataclass
 class InterfaceMetrics:
     sent_bytes: Counter
@@ -72,7 +87,6 @@ class InterfaceMetrics:
     sent_packets: Counter
     received_packets: Counter
     link_status: Enum
-
 
 class Interface:
     def __init__(self, xpath):
@@ -94,13 +108,13 @@ class Interface:
     def emit(self, base, stats, interface_metrics):
         name = base['alias']
 
-        print("{} emitting {}b sent, {}b received, {}pk send, {}pk received".format(
-            name,
-            value_diff(self.prior, stats, 'bytes_sent'),
-            value_diff(self.prior, stats, 'bytes_received'),
-            value_diff(self.prior, stats, 'packets_sent'),
-            value_diff(self.prior, stats, 'packets_received'),
-            ))
+        #print("{} emitting {}b sent, {}b received, {}pk send, {}pk received".format(
+        #    name,
+        #    value_diff(self.prior, stats, 'bytes_sent'),
+        #    value_diff(self.prior, stats, 'bytes_received'),
+        #    value_diff(self.prior, stats, 'packets_sent'),
+        #    value_diff(self.prior, stats, 'packets_received'),
+        #    ))
 
         interface_metrics.sent_bytes.labels(interface=name).inc(value_diff(self.prior, stats, 'bytes_sent'))
         interface_metrics.received_bytes.labels(interface=name).inc(value_diff(self.prior, stats, 'bytes_received'))
