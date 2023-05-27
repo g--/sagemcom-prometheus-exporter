@@ -1,4 +1,4 @@
-from prometheus_client import start_http_server, Counter, Info
+from prometheus_client import start_http_server, Counter, Info, Enum
 import time
 import asyncio
 from sagemcom_api.enums import EncryptionMethod
@@ -22,6 +22,7 @@ async def main() -> None:
         received_bytes = Counter('sagemcom_interface_received_bytes', '', ['interface']),
         sent_packets = Counter('sagemcom_interface_sent_packets', '', ['interface']),
         received_packets = Counter('sagemcom_interface_received_packets', '', ['interface']),
+        link_status = Enum('sagemcom_interface_status', '', ['interface'], states=['OK', 'UP', 'DOWN', 'DORMANT']),
         )
 
 
@@ -48,7 +49,7 @@ async def main() -> None:
         })
 
         targets = [Interface(f"Device/Ethernet/Interfaces/Interface[@uid='{number}']") for number in range(1,7)]
-        targets.append(Interface("Device/Optical/Interfaces/Interface[@uid='1']"))
+        targets.append(OpticalInterface("Device/Optical/Interfaces/Interface[@uid='1']"))
         targets.extend([WifiInterface(f"Device/WiFi/SSIDs/SSID[@uid='{number}']") for number in range(1,8)])
         for t in targets:
             await t.init(client)
@@ -70,6 +71,7 @@ class InterfaceMetrics:
     received_bytes: Counter
     sent_packets: Counter
     received_packets: Counter
+    link_status: Enum
 
 
 class Interface:
@@ -77,7 +79,11 @@ class Interface:
         self.xpath = xpath
 
     async def init(self, client):
-        self.prior = self.convert_stat_results(await client.get_value_by_xpath(f"{self.xpath}/Stats"))
+        try:
+            self.prior = self.convert_stat_results(await client.get_value_by_xpath(f"{self.xpath}/Stats"))
+        except Exception:
+            print(f"problem getting {self.xpath}")
+            raise
 
     async def collect(self, client, interface_metrics):
         base_result = await client.get_value_by_xpath(self.xpath)
@@ -88,15 +94,31 @@ class Interface:
     def emit(self, base, stats, interface_metrics):
         name = base['alias']
 
+        print("{} emitting {}b sent, {}b received, {}pk send, {}pk received".format(
+            name,
+            value_diff(self.prior, stats, 'bytes_sent'),
+            value_diff(self.prior, stats, 'bytes_received'),
+            value_diff(self.prior, stats, 'packets_sent'),
+            value_diff(self.prior, stats, 'packets_received'),
+            ))
+
         interface_metrics.sent_bytes.labels(interface=name).inc(value_diff(self.prior, stats, 'bytes_sent'))
         interface_metrics.received_bytes.labels(interface=name).inc(value_diff(self.prior, stats, 'bytes_received'))
         interface_metrics.sent_packets.labels(interface=name).inc(value_diff(self.prior, stats, 'packets_sent'))
         interface_metrics.received_packets.labels(interface=name).inc(value_diff(self.prior, stats, 'packets_received'))
 
+        self.emit_link_state(base, interface_metrics)
+
     def convert_stat_results(self, results):
         stats = results['stats']
         return {k:int(v) for (k,v) in results['stats'].items()}
 
+    def emit_link_state(self, base, interface_metrics):
+        name = base['alias']
+        interface_metrics.link_status.labels(interface=name).state(base['status'])
+
+class OpticalInterface(Interface):
+    pass
 
 class WifiInterface(Interface):
     async def init(self, client):
