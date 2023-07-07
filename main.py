@@ -108,18 +108,10 @@ class Interface:
     def emit(self, base, stats, interface_metrics):
         name = base['alias']
 
-        #print("{} emitting {}b sent, {}b received, {}pk send, {}pk received".format(
-        #    name,
-        #    value_diff(self.prior, stats, 'bytes_sent'),
-        #    value_diff(self.prior, stats, 'bytes_received'),
-        #    value_diff(self.prior, stats, 'packets_sent'),
-        #    value_diff(self.prior, stats, 'packets_received'),
-        #    ))
-
-        interface_metrics.sent_bytes.labels(interface=name).inc(value_diff(self.prior, stats, 'bytes_sent'))
-        interface_metrics.received_bytes.labels(interface=name).inc(value_diff(self.prior, stats, 'bytes_received'))
-        interface_metrics.sent_packets.labels(interface=name).inc(value_diff(self.prior, stats, 'packets_sent'))
-        interface_metrics.received_packets.labels(interface=name).inc(value_diff(self.prior, stats, 'packets_received'))
+        interface_metrics.sent_bytes.labels(interface=name).inc(valud_diff_non_negative(self.prior, stats, 'bytes_sent'))
+        interface_metrics.received_bytes.labels(interface=name).inc(valud_diff_non_negative(self.prior, stats, 'bytes_received'))
+        interface_metrics.sent_packets.labels(interface=name).inc(valud_diff_non_negative(self.prior, stats, 'packets_sent'))
+        interface_metrics.received_packets.labels(interface=name).inc(valud_diff_non_negative(self.prior, stats, 'packets_received'))
 
         self.emit_link_state(base, interface_metrics)
 
@@ -146,6 +138,10 @@ class WifiInterface(Interface):
         self.emit(base_result['SSID'], stats_result, interface_metrics)
         self.prior = stats_result
 
+
+def value_diff_non_negative(old_data, new_data, key):
+    d = value_diff(old_data, new_data, key)
+    return d if d >= 0 else 0 
 
 def value_diff(old_data, new_data, key):
     return new_data[key] - old_data[key]
