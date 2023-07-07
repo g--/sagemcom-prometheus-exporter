@@ -108,10 +108,10 @@ class Interface:
     def emit(self, base, stats, interface_metrics):
         name = base['alias']
 
-        interface_metrics.sent_bytes.labels(interface=name).inc(valud_diff_non_negative(self.prior, stats, 'bytes_sent'))
-        interface_metrics.received_bytes.labels(interface=name).inc(valud_diff_non_negative(self.prior, stats, 'bytes_received'))
-        interface_metrics.sent_packets.labels(interface=name).inc(valud_diff_non_negative(self.prior, stats, 'packets_sent'))
-        interface_metrics.received_packets.labels(interface=name).inc(valud_diff_non_negative(self.prior, stats, 'packets_received'))
+        interface_metrics.sent_bytes.labels(interface=name).inc(value_diff_non_negative(self.prior, stats, 'bytes_sent'))
+        interface_metrics.received_bytes.labels(interface=name).inc(value_diff_non_negative(self.prior, stats, 'bytes_received'))
+        interface_metrics.sent_packets.labels(interface=name).inc(value_diff_non_negative(self.prior, stats, 'packets_sent'))
+        interface_metrics.received_packets.labels(interface=name).inc(value_diff_non_negative(self.prior, stats, 'packets_received'))
 
         self.emit_link_state(base, interface_metrics)
 
