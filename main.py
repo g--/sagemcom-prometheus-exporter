@@ -70,6 +70,7 @@ class SystemMetrics:
     def __init__(self):
         self._total_memory = Gauge('sagemcom_system_total_memory', '', [])
         self._free_memory = Gauge('sagemcom_system_free_memory', '', [])
+        self._status = Info('sagemcom_internet_status', 'Is the internet accessible.', '', [])
 
     async def init(self, client):
         pass
@@ -78,6 +79,15 @@ class SystemMetrics:
         results = await client.get_value_by_xpath("Device/DeviceInfo")
         self._total_memory.set(results["device_info"]["memory_status"]["total"])
         self._free_memory.set(results["device_info"]["memory_status"]["free"])
+
+        ip = await client.get_value_by_xpath("Device\/IP\/Interfaces\/Interface[@uid='2']\/IPv4Addresses\/IPv4Address[@uid='1']")
+        up = await client.get_value_by_xpath("Device\/PPP\/Interfaces\/Interface[@uid='1']")
+
+        self._status.info({
+            'ip_address': ip['i_pv4_address']['ip_address'],
+            'status': up['interface']['status'],
+        })
+
 
 
 @dataclass
