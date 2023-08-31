@@ -1,5 +1,6 @@
 from prometheus_client import start_http_server, Counter, Info, Enum, Gauge
 import time
+import sys
 import asyncio
 from sagemcom_api.enums import EncryptionMethod
 from sagemcom_api.client import SagemcomClient
@@ -14,7 +15,38 @@ PASSWORD = os.environ['SAGEMCOM_PASSWORD']
 ENCRYPTION_METHOD = EncryptionMethod.SHA512
 INTERVAL_SECONDS = int(os.environ['SAGEMCOM_POLL_INTERVAL_SECONDS'])
 
-async def main() -> None:
+async def main(args) -> None:
+    if len(args) > 1 and args[1] == "memorycheck":
+        if len(args) != 3:
+            # Maybe 250MiB is a good target
+            print("Usage: sagemcom-prometheus-exporter memorycheck <minimum_KiB>\n\nif the device has less then specified, it's rebooted.")
+            exit(1)
+        await memory_check(float(args[2]))
+    else:
+        await exporter_main()
+
+
+async def memory_check(minimum_mib) -> None:
+    async with SagemcomClient(HOST, USERNAME, PASSWORD, ENCRYPTION_METHOD) as client:
+        try:
+            await client.login()
+            print("logged in")
+        except Exception as exception:  # pylint: disable=broad-except
+            print(f"failed to login! exception was: {exception}")
+            exit(1)
+
+        results = await client.get_value_by_xpath("Device/DeviceInfo")
+        free_mem_kib = results["device_info"]["memory_status"]["free"]
+        free_mem_mib = free_mem_kib/1024
+        print(f"free memory: {free_mem_mib}MiB")
+        if free_mem_mib < minimum_mib:
+            print(f"free memory is {free_mem_mib}MiB which is below threshold of {minimum_mib}, rebooting")
+            await client.reboot()
+        else:
+            print(f"free memory is {free_mem_mib}MiB is above threshold")
+
+
+async def exporter_main() -> None:
     start_http_server(8000)
 
     interface_metrics = InterfaceMetrics(
@@ -156,5 +188,5 @@ def value_diff_non_negative(old_data, new_data, key):
 def value_diff(old_data, new_data, key):
     return new_data[key] - old_data[key]
 
-asyncio.run(main())
+asyncio.run(main(sys.argv))
 

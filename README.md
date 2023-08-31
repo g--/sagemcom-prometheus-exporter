@@ -15,6 +15,21 @@ docker run -p 8000:8000 -e SAGEMCOM_HOST=192.168.0.1 -e SAGEMCOM_PASSWORD=sekret
 
 and point prometheus at port 8000.
 
+## Low Memory Checker
+
+If you pass in the arguments `memorycheck <number of MiB>` it will reboot the
+device if the device currently has less than the given amount of memory free.
+Great for running at a cron job in the middle of the night.
+
+for example:
+
+
+```
+docker run -p 8000:8000 -e SAGEMCOM_HOST=192.168.0.1 -e SAGEMCOM_PASSWORD=sekret  -it geoffo/sagemcom-prometheus-exporter python main.py memorycheck 250
+```
+
+and point prometheus at port 8000.
+
 ## kubernetes
 
 ```
