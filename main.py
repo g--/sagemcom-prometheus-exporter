@@ -8,12 +8,17 @@ import asyncio
 import os
 from aiohttp import ClientSession, ClientTimeout
 from dataclasses import dataclass
+import google.cloud.dns
 
 HOST = os.environ['SAGEMCOM_HOST']
 USERNAME = os.environ['SAGEMCOM_USERNAME']
 PASSWORD = os.environ['SAGEMCOM_PASSWORD']
 ENCRYPTION_METHOD = EncryptionMethod.SHA512
 INTERVAL_SECONDS = int(os.environ['SAGEMCOM_POLL_INTERVAL_SECONDS'])
+
+ZONE = os.environ.get('TARGET_ZONE')
+DOMAIN = os.environ.get('TARGET_DOMAIN')
+
 
 async def main(args) -> None:
     if len(args) > 1 and args[1] == "memorycheck":
@@ -22,12 +27,16 @@ async def main(args) -> None:
             print("Usage: sagemcom-prometheus-exporter memorycheck <minimum_KiB>\n\nif the device has less then specified, it's rebooted.")
             exit(1)
         await memory_check(float(args[2]))
+    elif len(args) > 1 and args[1] == "updatedns-gcp":
+        assert ZONE is not None, "Must set environment variable ZONE"
+        assert DOMAIN is not None, "Must set environment variable DOMAIN"
+        await update_dns(ZONE, DOMAIN)
     else:
         await exporter_main()
 
 
 async def memory_check(minimum_mib) -> None:
-    async with SagemcomClient(HOST, USERNAME, PASSWORD, ENCRYPTION_METHOD) as client:
+    async with get_sagemcom_client() as client:
         try:
             await client.login()
             print("logged in")
@@ -58,7 +67,7 @@ async def exporter_main() -> None:
         )
 
 
-    async with SagemcomClient(HOST, USERNAME, PASSWORD, ENCRYPTION_METHOD) as client:
+    async with get_sagemcom_client() as client:
         try:
             await client.login()
             print("logged in")
@@ -187,6 +196,59 @@ def value_diff_non_negative(old_data, new_data, key):
 
 def value_diff(old_data, new_data, key):
     return new_data[key] - old_data[key]
+
+
+async def update_dns(zone, domain) -> None:
+        router = await get_router_ip()
+        await update_ip(zone, domain, router)
+
+
+async def get_router_ip() -> str:
+    async with get_sagemcom_client() as client:
+        try:
+            await client.login()
+        except Exception as exception:  # pylint: disable=broad-except
+            print(f"failed to login! exception was: {exception}")
+            exit(1)
+
+        ip_result = await client.get_value_by_xpath("Device\/IP\/Interfaces\/Interface[@uid='2']\/IPv4Addresses\/IPv4Address[@uid='1']")
+        ip = ip_result['i_pv4_address']['ip_address']
+        return ip
+
+
+async def update_ip(zone, domain, target) -> str:
+    zone_name = zone
+    #zone_name = "street.oakham.ca"
+    project_id = "atlas-support"
+
+    # from google.cloud import dns
+
+    client = google.cloud.dns.Client(project=project_id)
+    zone = client.zone(zone_name)
+
+    # Fetch all TXT records from the zone
+    records = zone.list_resource_record_sets()
+    changes = zone.changes()
+
+    for record in records:
+        if record.record_type == "A" and record.name == domain:
+            if len(record.rrdatas) > 0 and record.rrdatas[0] != target:
+                print(f"updating {domain} from {record.rrdatas[0]} to {target} (in zone {zone}")
+
+                new_record = google.cloud.dns.ResourceRecordSet(zone=zone, name=record.name, record_type='A', rrdatas=[target], ttl=300)
+
+                changes.delete_record_set(record)
+                changes.add_record_set(new_record)
+    try:
+        changes.create()
+    except Exception as ex:
+        print(ex)
+    # print("records updated successfully.")
+
+
+def get_sagemcom_client():
+    return SagemcomClient(HOST, USERNAME, PASSWORD, ENCRYPTION_METHOD)
+
 
 asyncio.run(main(sys.argv))
 
