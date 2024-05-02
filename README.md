@@ -30,6 +30,21 @@ docker run -p 8000:8000 -e SAGEMCOM_HOST=192.168.0.1 -e SAGEMCOM_PASSWORD=sekret
 
 and point prometheus at port 8000.
 
+## GCP DNS updater
+
+```
+docker run -p 8000:8000 -e SAGEMCOM_HOST=192.168.0.1 -e SAGEMCOM_PASSWORD=sekret \
+    --mount type=bind,source="gcloud-creds-ip-updater.json,target=/credentials.json,readonly \
+    -e GOOGLE_APPLICATION_CREDENTIALS=/credentials.json  \
+    -e TARGET_ZONE=my-gcp-zone-resource-name  \
+    -e TARGET_DOMAIN=the.domain.name.example.com.  \
+    -it geoffo/sagemcom-prometheus-exporter:local_ipupdate python main.py updatedns-gcp
+```
+
+This requires [gcp credentials--see gcp
+documentation](https://cloud.google.com/docs/authentication/application-default-credentials).
+In the example above, it's using the `GOOGLE_APPLICATION_CREDENTIALS` file method.
+
 ## kubernetes
 
 ```
